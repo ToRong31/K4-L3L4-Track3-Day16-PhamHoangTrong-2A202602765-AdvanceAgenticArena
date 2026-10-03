@@ -1,0 +1,805 @@
+{
+  "method": {
+    "model": "MockModel",
+    "seed": "11 + public brief index",
+    "corpus_seeds": [
+      42,
+      73
+    ],
+    "note": "Counterfactual budget 20 is diagnostic only. Ground truth is used only for analysis."
+  },
+  "cases": [
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-04-lam-viec-tu-xa",
+      "limit": 8,
+      "flaky": true,
+      "total": 70.0735,
+      "recall": 0.5,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0001": 1,
+        "doc-0002": 2
+      },
+      "fetched": [
+        "doc-0001",
+        "doc-0002",
+        "doc-0025",
+        "doc-0084",
+        "doc-0084",
+        "doc-0026"
+      ],
+      "observed_sources": [
+        "doc-0001",
+        "doc-0002",
+        "doc-0025",
+        "doc-0026",
+        "doc-0084"
+      ],
+      "raw_claims": 1,
+      "submitted_claims": 0,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0001",
+        "doc-0002"
+      ],
+      "tool_calls": 8,
+      "model_calls": 7,
+      "abstain": true
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-04-lam-viec-tu-xa",
+      "limit": 8,
+      "flaky": false,
+      "total": 70.0735,
+      "recall": 0.5,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0001": 1,
+        "doc-0002": 2
+      },
+      "fetched": [
+        "doc-0001",
+        "doc-0002",
+        "doc-0025",
+        "doc-0084",
+        "doc-0026"
+      ],
+      "observed_sources": [
+        "doc-0001",
+        "doc-0002",
+        "doc-0025",
+        "doc-0026",
+        "doc-0084"
+      ],
+      "raw_claims": 1,
+      "submitted_claims": 0,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0001",
+        "doc-0002"
+      ],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": true
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-04-lam-viec-tu-xa",
+      "limit": 20,
+      "flaky": false,
+      "total": 66.5529,
+      "recall": 0.5,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0001": 1,
+        "doc-0002": 2
+      },
+      "fetched": [
+        "doc-0001",
+        "doc-0002",
+        "doc-0025",
+        "doc-0084",
+        "doc-0026",
+        "doc-0001",
+        "doc-0002"
+      ],
+      "observed_sources": [
+        "doc-0001",
+        "doc-0002",
+        "doc-0025",
+        "doc-0026",
+        "doc-0084"
+      ],
+      "raw_claims": 1,
+      "submitted_claims": 0,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0001",
+        "doc-0002"
+      ],
+      "tool_calls": 11,
+      "model_calls": 11,
+      "abstain": true
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-05-chi-so-kho-lanh",
+      "limit": 8,
+      "flaky": true,
+      "total": 85.0368,
+      "recall": 0.75,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0007": 1
+      },
+      "fetched": [
+        "doc-0007",
+        "doc-0043",
+        "doc-0043",
+        "doc-0105",
+        "doc-0006",
+        "doc-0041"
+      ],
+      "observed_sources": [
+        "doc-0007",
+        "doc-0041",
+        "doc-0043",
+        "doc-0105"
+      ],
+      "raw_claims": 1,
+      "submitted_claims": 0,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0007"
+      ],
+      "tool_calls": 8,
+      "model_calls": 7,
+      "abstain": true
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-05-chi-so-kho-lanh",
+      "limit": 8,
+      "flaky": false,
+      "total": 85.0368,
+      "recall": 0.75,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0007": 1
+      },
+      "fetched": [
+        "doc-0007",
+        "doc-0043",
+        "doc-0105",
+        "doc-0006",
+        "doc-0041"
+      ],
+      "observed_sources": [
+        "doc-0007",
+        "doc-0041",
+        "doc-0043",
+        "doc-0105"
+      ],
+      "raw_claims": 1,
+      "submitted_claims": 0,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0007"
+      ],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": true
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-05-chi-so-kho-lanh",
+      "limit": 20,
+      "flaky": false,
+      "total": 82.8309,
+      "recall": 0.75,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0007": 1
+      },
+      "fetched": [
+        "doc-0007",
+        "doc-0043",
+        "doc-0105",
+        "doc-0006",
+        "doc-0041",
+        "doc-0007",
+        "doc-0043"
+      ],
+      "observed_sources": [
+        "doc-0007",
+        "doc-0041",
+        "doc-0043",
+        "doc-0105"
+      ],
+      "raw_claims": 1,
+      "submitted_claims": 0,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0007"
+      ],
+      "tool_calls": 11,
+      "model_calls": 11,
+      "abstain": true
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-08-an-toan-boc-do",
+      "limit": 8,
+      "flaky": true,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0017": 56
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0008",
+        "doc-0070",
+        "doc-0041",
+        "doc-0018"
+      ],
+      "observed_sources": [
+        "doc-0008",
+        "doc-0018",
+        "doc-0041",
+        "doc-0070"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [],
+      "tool_calls": 8,
+      "model_calls": 7,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-08-an-toan-boc-do",
+      "limit": 8,
+      "flaky": false,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0017": 56
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0008",
+        "doc-0070",
+        "doc-0041",
+        "doc-0018"
+      ],
+      "observed_sources": [
+        "doc-0008",
+        "doc-0018",
+        "doc-0041",
+        "doc-0070"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-08-an-toan-boc-do",
+      "limit": 20,
+      "flaky": false,
+      "total": 37.3059,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0017": 56
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0008",
+        "doc-0070",
+        "doc-0041",
+        "doc-0018",
+        "doc-0006",
+        "doc-0008"
+      ],
+      "observed_sources": [
+        "doc-0008",
+        "doc-0018",
+        "doc-0041",
+        "doc-0070"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [],
+      "tool_calls": 11,
+      "model_calls": 11,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-09-so-vu-voi-doi-tac-moi",
+      "limit": 8,
+      "flaky": true,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0101": 83
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0008",
+        "doc-0003",
+        "doc-0003",
+        "doc-0005",
+        "doc-0005"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0005",
+        "doc-0008"
+      ],
+      "raw_claims": 1,
+      "submitted_claims": 1,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [],
+      "tool_calls": 8,
+      "model_calls": 6,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-09-so-vu-voi-doi-tac-moi",
+      "limit": 8,
+      "flaky": false,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0101": 83
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0008",
+        "doc-0003",
+        "doc-0005",
+        "doc-0021"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0005",
+        "doc-0008",
+        "doc-0021"
+      ],
+      "raw_claims": 2,
+      "submitted_claims": 2,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 42,
+      "brief_id": "pub-09-so-vu-voi-doi-tac-moi",
+      "limit": 20,
+      "flaky": false,
+      "total": 37.3059,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0101": 83
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0008",
+        "doc-0003",
+        "doc-0005",
+        "doc-0021",
+        "doc-0006",
+        "doc-0008"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0005",
+        "doc-0008",
+        "doc-0021"
+      ],
+      "raw_claims": 2,
+      "submitted_claims": 2,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [],
+      "tool_calls": 11,
+      "model_calls": 11,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-02-hoan-tien-toan-quoc",
+      "limit": 8,
+      "flaky": true,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0021": 4
+      },
+      "fetched": [
+        "doc-0005",
+        "doc-0022",
+        "doc-0022",
+        "doc-0023",
+        "doc-0021",
+        "doc-0024"
+      ],
+      "observed_sources": [
+        "doc-0005",
+        "doc-0021",
+        "doc-0022",
+        "doc-0023"
+      ],
+      "raw_claims": 3,
+      "submitted_claims": 3,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0021"
+      ],
+      "tool_calls": 8,
+      "model_calls": 7,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-02-hoan-tien-toan-quoc",
+      "limit": 8,
+      "flaky": false,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0021": 4
+      },
+      "fetched": [
+        "doc-0005",
+        "doc-0022",
+        "doc-0023",
+        "doc-0021",
+        "doc-0024"
+      ],
+      "observed_sources": [
+        "doc-0005",
+        "doc-0021",
+        "doc-0022",
+        "doc-0023",
+        "doc-0024"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0021"
+      ],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-02-hoan-tien-toan-quoc",
+      "limit": 20,
+      "flaky": false,
+      "total": 37.3059,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0021": 4
+      },
+      "fetched": [
+        "doc-0005",
+        "doc-0022",
+        "doc-0023",
+        "doc-0021",
+        "doc-0024",
+        "doc-0005",
+        "doc-0022"
+      ],
+      "observed_sources": [
+        "doc-0005",
+        "doc-0021",
+        "doc-0022",
+        "doc-0023",
+        "doc-0024"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0021"
+      ],
+      "tool_calls": 11,
+      "model_calls": 11,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-03-ticket-doi-tra",
+      "limit": 8,
+      "flaky": true,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0023": 5
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0005",
+        "doc-0003",
+        "doc-0106",
+        "doc-0106",
+        "doc-0023"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0005",
+        "doc-0023",
+        "doc-0106"
+      ],
+      "raw_claims": 2,
+      "submitted_claims": 2,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0023"
+      ],
+      "tool_calls": 8,
+      "model_calls": 7,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-03-ticket-doi-tra",
+      "limit": 8,
+      "flaky": false,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0023": 5
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0005",
+        "doc-0003",
+        "doc-0106",
+        "doc-0023"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0005",
+        "doc-0023",
+        "doc-0106"
+      ],
+      "raw_claims": 2,
+      "submitted_claims": 2,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0023"
+      ],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-03-ticket-doi-tra",
+      "limit": 20,
+      "flaky": false,
+      "total": 38.5235,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0023": 5
+      },
+      "fetched": [
+        "doc-0006",
+        "doc-0005",
+        "doc-0003",
+        "doc-0106",
+        "doc-0023",
+        "doc-0006",
+        "doc-0005"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0005",
+        "doc-0023",
+        "doc-0106"
+      ],
+      "raw_claims": 2,
+      "submitted_claims": 2,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0023"
+      ],
+      "tool_calls": 11,
+      "model_calls": 11,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-07-chi-phi-cong-tac",
+      "limit": 8,
+      "flaky": true,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0033": 3
+      },
+      "fetched": [
+        "doc-0004",
+        "doc-0003",
+        "doc-0033",
+        "doc-0086",
+        "doc-0021"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0004",
+        "doc-0021",
+        "doc-0033",
+        "doc-0086"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0033"
+      ],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-07-chi-phi-cong-tac",
+      "limit": 8,
+      "flaky": false,
+      "total": 40.1471,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0033": 3
+      },
+      "fetched": [
+        "doc-0004",
+        "doc-0003",
+        "doc-0033",
+        "doc-0086",
+        "doc-0021"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0004",
+        "doc-0021",
+        "doc-0033",
+        "doc-0086"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0033"
+      ],
+      "tool_calls": 8,
+      "model_calls": 8,
+      "abstain": false
+    },
+    {
+      "corpus_seed": 73,
+      "brief_id": "pub-07-chi-phi-cong-tac",
+      "limit": 20,
+      "flaky": false,
+      "total": 37.3059,
+      "recall": 0.0,
+      "gate": true,
+      "required_source_rank": {
+        "doc-0033": 3
+      },
+      "fetched": [
+        "doc-0004",
+        "doc-0003",
+        "doc-0033",
+        "doc-0086",
+        "doc-0021",
+        "doc-0004",
+        "doc-0003"
+      ],
+      "observed_sources": [
+        "doc-0003",
+        "doc-0004",
+        "doc-0021",
+        "doc-0033",
+        "doc-0086"
+      ],
+      "raw_claims": 4,
+      "submitted_claims": 4,
+      "raw_verdict": null,
+      "submitted_verdict": null,
+      "required_sources_fetched": [
+        "doc-0033"
+      ],
+      "tool_calls": 11,
+      "model_calls": 11,
+      "abstain": false
+    }
+  ],
+  "critic_overlap_experiment": {
+    "source_offsets": [
+      83,
+      86,
+      136
+    ],
+    "current_checked_offsets": [
+      83,
+      136
+    ],
+    "current_claims": 0,
+    "overlap_scan_claims": 2,
+    "total_before": 70.0735,
+    "total_after": 70.0735,
+    "recall_before": 0.5,
+    "recall_after": 0.5,
+    "gate_before": true,
+    "gate_after": true
+  },
+  "groundtruth_compatibility": {
+    "public_fixture_corpus_seed": 42,
+    "checked_briefs": [
+      "pub-02",
+      "pub-03",
+      "pub-07"
+    ],
+    "expected_quote_present_at_declared_source_seed42": [
+      true,
+      true,
+      true
+    ],
+    "expected_quote_present_at_declared_source_seed73": [
+      false,
+      false,
+      false
+    ]
+  }
+}

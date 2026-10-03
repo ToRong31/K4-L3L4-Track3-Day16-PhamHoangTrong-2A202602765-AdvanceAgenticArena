@@ -511,6 +511,9 @@ class ReActAgent:
             {"role": "user", "content": ctx.question},
         ]
         self.middleware.before_agent(ctx)
+        model_call, tool_call = self.middleware.bind_calls(
+            ctx, self._call_model, self._dispatch
+        )
 
         report: dict = {}
         ctx.stop_reason = "max_steps"
@@ -518,7 +521,7 @@ class ReActAgent:
             ctx.step = step
 
             outbound = self.middleware.before_model(ctx, list(ctx.messages))
-            response = self.middleware.wrap_model_call(ctx, self._call_model)(outbound)
+            response = model_call(outbound)
             response = self.middleware.after_model(ctx, response)
 
             text = getattr(response, "text", None)
@@ -536,7 +539,7 @@ class ReActAgent:
                 ctx.stop_reason = "final"
                 break
 
-            observation = self._observe(ctx, parsed)
+            observation = self._observe(ctx, parsed, tool_call)
             ctx.observations.append(observation)
             ctx.messages.append({"role": "user", "content": observation})
 
@@ -643,7 +646,7 @@ class ReActAgent:
 
     # -- the tools -----------------------------------------------------
 
-    def _observe(self, ctx: AgentContext, parsed) -> str:
+    def _observe(self, ctx: AgentContext, parsed, tool_call=None) -> str:
         """Run one tool call through the `wrap_tool_call` chain and turn
         the result into the observation string the model is shown."""
         if parsed.kind != "action" or not parsed.tool:
@@ -655,7 +658,7 @@ class ReActAgent:
                 "THOUGHT/ACTION hoặc THOUGHT/FINAL."
             )
 
-        call = self.middleware.wrap_tool_call(ctx, self._dispatch)
+        call = tool_call if tool_call is not None else self.middleware.wrap_tool_call(ctx, self._dispatch)
         result = call(parsed.tool, dict(parsed.args))
         if result is None or not hasattr(result, "ok"):
             return f"{TOOL_ERROR_PREFIX} layer trả về kết quả không hợp lệ cho {parsed.tool}"

@@ -1,0 +1,78 @@
+{
+  "baseline": {
+    "mean": 25.1997,
+    "std": 11.8247,
+    "gates": "45/45",
+    "max_tool_calls": 13,
+    "mean_within_brief_std": 2.8504,
+    "canary_leaks": 27,
+    "hallucinated_runs": 11
+  },
+  "full": {
+    "mean": 81.7116,
+    "std": 24.2075,
+    "gates": "45/45",
+    "max_tool_calls": 8,
+    "mean_within_brief_std": 0.0,
+    "canary_leaks": 0,
+    "hallucinated_runs": 0
+  },
+  "without_injection_guard": {
+    "mean": 72.643,
+    "std": 27.465,
+    "gates": "45/45",
+    "max_tool_calls": 8,
+    "mean_within_brief_std": 0.0,
+    "canary_leaks": 25,
+    "hallucinated_runs": 0
+  },
+  "without_critic": {
+    "mean": 69.7712,
+    "std": 34.232,
+    "gates": "45/45",
+    "max_tool_calls": 8,
+    "mean_within_brief_std": 0.0,
+    "canary_leaks": 0,
+    "hallucinated_runs": 10
+  },
+  "without_citation_checker": {
+    "mean": 41.2051,
+    "std": 20.031,
+    "gates": "45/45",
+    "max_tool_calls": 8,
+    "mean_within_brief_std": 0.0,
+    "canary_leaks": 0,
+    "hallucinated_runs": 0
+  },
+  "without_budget_policy": {
+    "mean": 78.9247,
+    "std": 24.143,
+    "gates": "45/45",
+    "max_tool_calls": 8,
+    "mean_within_brief_std": 0.2271,
+    "canary_leaks": 0,
+    "hallucinated_runs": 0
+  },
+  "without_retry": {
+    "mean": 76.8146,
+    "std": 26.7024,
+    "gates": "45/45",
+    "max_tool_calls": 8,
+    "mean_within_brief_std": 7.7318,
+    "canary_leaks": 0,
+    "hallucinated_runs": 0
+  },
+  "metadata": {
+    "seeds": [
+      11,
+      23,
+      37,
+      51,
+      71
+    ],
+    "corpus_seed": 42,
+    "model": "mock",
+    "brief_set": "public",
+    "runs_per_variant": 45
+  }
+}

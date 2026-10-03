@@ -231,6 +231,7 @@ class LoggingMiddleware(Middleware):
         ctx.trace.emit("layer", layer=self.label, hook=hook, step=ctx.step, **fields)
 
     def before_agent(self, ctx) -> None:
+        self.events.clear()
         self._log(ctx, "before_agent", brief_id=str(ctx.brief.get("brief_id", "")))
 
     def before_model(self, ctx, messages):
@@ -297,11 +298,14 @@ class MiddlewareStack:
     def before_model(self, ctx, messages: list[dict]) -> list[dict]:
         for layer in self.middleware:
             messages = layer.before_model(ctx, messages)
+            if not isinstance(messages, list):
+                raise TypeError(f"{layer.label}.before_model must return a list")
         return messages
 
     def after_model(self, ctx, response):
         for layer in reversed(self.middleware):
             response = layer.after_model(ctx, response)
+            _validate_model_response(layer, "after_model", response)
         return response
 
     def after_agent(self, ctx, report: dict) -> dict:
@@ -315,6 +319,10 @@ class MiddlewareStack:
         return report
 
     # -- nested wraps --------------------------------------------------
+
+    def bind_calls(self, ctx, model_call, tool_call):
+        """Bind both chains to this run; topology stays fixed until it ends."""
+        return self.wrap_model_call(ctx, model_call), self.wrap_tool_call(ctx, tool_call)
 
     def wrap_model_call(self, ctx, call):
         """Return `call` wrapped by every layer, list-order outermost."""
@@ -334,13 +342,42 @@ def _bind_model_wrap(layer: Middleware, ctx, inner):
     # directly is the classic late-binding bug and every layer would end
     # up calling the last one.
     def wrapped(messages):
-        return layer.wrap_model_call(ctx, inner, messages)
+        response = layer.wrap_model_call(ctx, inner, messages)
+        _validate_model_response(layer, "wrap_model_call", response)
+        return response
 
     return wrapped
 
 
 def _bind_tool_wrap(layer: Middleware, ctx, inner):
     def wrapped(name, args):
-        return layer.wrap_tool_call(ctx, inner, name, args)
+        result = layer.wrap_tool_call(ctx, inner, name, args)
+        _validate_tool_result(layer, result)
+        return result
 
     return wrapped
+
+
+def _validate_model_response(layer, hook, response):
+    if not (
+        isinstance(getattr(response, "text", None), str)
+        and hasattr(response, "prompt_tokens")
+        and hasattr(response, "completion_tokens")
+    ):
+        raise TypeError(
+            f"{layer.label}.{hook} must return a ModelResponse with str text "
+            "and prompt_tokens/completion_tokens"
+        )
+
+
+def _validate_tool_result(layer, result):
+    if not (
+        isinstance(getattr(result, "ok", None), bool)
+        and isinstance(getattr(result, "content", None), str)
+        and hasattr(result, "error")
+        and (result.error is None or isinstance(result.error, str))
+    ):
+        raise TypeError(
+            f"{layer.label}.wrap_tool_call must return a ToolResult "
+            "with bool ok, str content and str/None error"
+        )

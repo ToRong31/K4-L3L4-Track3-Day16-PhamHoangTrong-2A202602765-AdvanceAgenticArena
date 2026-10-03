@@ -70,6 +70,8 @@ Xem `harness/middleware.py` để biết thứ tự các hook.
 
 from __future__ import annotations
 
+from arena.corpus import INJECTION_CANARY
+
 from harness.middleware import Middleware
 
 
@@ -79,16 +81,56 @@ class Critic(Middleware):
     name = "critic"
 
     def after_agent(self, ctx, report):
-        # TODO (§2): khoảng 10-25 dòng.
-        #  1. Lấy report["claims"]; nếu rỗng hoặc không phải list thì thôi.
-        #  2. Với mỗi claim: nếu claim["text"] có trong ctx.observed_text
-        #     -> giữ nguyên (KHÔNG sửa chữ).
-        #  3. Nếu không: thử tách câu ghép (trường hợp (c) ở docstring).
-        #     Tách được -> giữ cả hai nửa, mỗi nửa gắn doc_id của tài liệu
-        #     thật sự chứa nó, và đặt report["abstain"] = True.
-        #  4. Không tách được -> đây là bịa: bỏ claim đi.
-        #  5. Nếu không còn claim nào: report["abstain"] = True,
-        #     claims = [], citations = [], và viết lại "answer" nói rõ là
-        #     không đủ căn cứ.
-        #  6. Cập nhật report["citations"] cho khớp với claims còn lại.
-        return report  # <- mặc định KHÔNG LÀM GÌ: agent vẫn chạy được
+        raw_claims = report.get("claims")
+        claims = raw_claims if isinstance(raw_claims, list) else []
+        observed = ctx.observed_text
+        docs = sorted(
+            (doc for doc in getattr(ctx.corpus, "docs", ())
+             if doc.body and doc.body in observed),
+            key=lambda doc: doc.doc_id,
+        )
+
+        def sources(text):
+            return [doc.doc_id for doc in docs
+                    if text and text in observed
+                    and any(text in line for line in doc.body.splitlines())]
+
+        kept = []
+        split = False
+        for claim in claims:
+            if not isinstance(claim, dict):
+                continue
+            text = claim.get("text")
+            if not isinstance(text, str) or not text.strip() or INJECTION_CANARY in text:
+                continue
+            if isinstance(claim.get("doc_id"), str) and claim["doc_id"] in sources(text):
+                kept.append(claim)
+                continue
+            # Only slice model text. A valid quote containing " và " stays whole.
+            offset = text.find(" và ")
+            while offset >= 0:
+                left, right = text[:offset].strip(), text[offset + 4:].strip()
+                pair = next(((a, b) for a in sources(left) for b in sources(right) if a != b), None)
+                if pair is not None:
+                    kept.extend(({**claim, "text": left, "doc_id": pair[0]},
+                                 {**claim, "text": right, "doc_id": pair[1]}))
+                    split = True
+                    break
+                offset = text.find(" và ", offset + 4)
+
+        result = {**report, "claims": kept,
+                  "citations": sorted({claim["doc_id"] for claim in kept})}
+        if not kept:
+            result.update(abstain=True, answer="Không đủ bằng chứng để trả lời chắc chắn.")
+        elif split:
+            result["abstain"] = True
+        if result.get("abstain"):
+            result.pop("verdict", None)
+        if kept and (kept != raw_claims or split):
+            answer = "\n".join(claim["text"] for claim in kept)
+            if result.get("abstain"):
+                answer += "\nChưa đủ căn cứ để xác nhận kết luận tổng hợp."
+            elif isinstance(result.get("verdict"), str):
+                answer += "\n" + result["verdict"]
+            result["answer"] = answer
+        return result
