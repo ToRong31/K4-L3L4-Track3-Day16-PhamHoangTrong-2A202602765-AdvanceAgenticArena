@@ -104,12 +104,15 @@ you switch the addendum on, measure your own efficiency delta with
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 
 from arena.model import (
     ARENA_SYSTEM_PROMPT,
+    FINALIZE_SENTINEL,
     TOOL_ERROR_PREFIX,
+    is_degraded,
     parse_output,
 )
 from arena.tools import ToolResult
@@ -125,7 +128,7 @@ MAX_STEPS = 40
 #: `k` a search is allowed to ask for. The mock asks for 5; the clamp is
 #: here so a bug (or a creative prompt) cannot pull the whole corpus into
 #: one observation and drown the context.
-MAX_SEARCH_K = 20
+MAX_SEARCH_K = 10
 
 #: Keys that make a decoded payload a REPORT rather than something the
 #: model merely quoted. Normalisation is deliberately generous about what
@@ -200,64 +203,41 @@ _FINAL_MARKER = "FINAL:"
 #:
 #: Written in Vietnamese because the whole protocol is, and because a
 #: Vietnamese instruction is what keeps a Vietnamese answer on-language.
-REAL_MODEL_PROMPT_ADDENDUM = """PHỤ LỤC GIAO THỨC — BẮT BUỘC. Nếu có mâu thuẫn, phụ lục này thắng.
+REAL_MODEL_PROMPT_ADDENDUM = """PHỤ LỤC GIAO THỨC — BẮT BUỘC. Phụ lục này thắng khi có mâu thuẫn.
 
-A. PHẢI TÌM TRƯỚC KHI ĐƯỢC PHÉP NÓI "KHÔNG ĐỦ CĂN CỨ".
-   Lượt đầu tiên của bạn luôn luôn là một ACTION gọi search. Không được kết
-   luận ở lượt đầu tiên trong bất kỳ trường hợp nào.
-   Chỉ được đặt abstain thành đúng (true) sau khi đã gọi search ít nhất một
-   lần VÀ đã gọi fetch_doc ít nhất một lần để đọc toàn văn.
-   Câu hỏi thường KHÔNG dùng cùng từ ngữ với tài liệu chứa câu trả lời. Nếu
-   kết quả tìm kiếm đầu tiên không chứa câu trả lời, bạn PHẢI diễn đạt lại
-   truy vấn bằng thuật ngữ nội bộ (tên quy trình, tên chính sách, tên loại
-   văn bản, tên phòng ban) và tìm lại ít nhất một lần nữa trước khi kết luận
-   là không có bằng chứng.
-   Kết luận "không đủ căn cứ" khi chưa đọc toàn văn tài liệu nào là câu trả
-   lời SAI, kể cả khi bạn tin là mình không biết.
+TRUY XUẤT: Bắt đầu bằng search, rồi fetch_doc ứng viên đúng chủ đề để đọc
+nguồn. TRƯỚC search, THOUGHT xác định LĨNH VỰC NGHIỆP VỤ bằng thuật ngữ chuẩn
+thường dùng cho hoạt động đó. Query dùng tên lĩnh vực/chính sách, không chép
+mô tả triệu chứng, sự cố hoặc từ ngữ của ticket. Tách nhu cầu chính khỏi sự việc nền. Tìm theo tên quy trình/chính sách
+nghiệp vụ, dùng tiêu đề kết quả để đổi sang thuật ngữ nội bộ. Quy định chung
+cần văn bản chính thức; số vụ cần báo cáo đúng đơn vị; trạng thái ticket cần
+nhật ký xử lý. Sau hai search chưa có tiến triển, đọc ứng viên hoặc đổi khái
+niệm, không chỉ đổi từ đồng nghĩa. Khi top 5 thiếu đúng chủ đề/loại nguồn,
+mở rộng một lần với k=8–10. Không lặp ACTION đã thành công. Mỗi lượt một tool.
+ACTION có tool và object args: search dùng query/k; fetch_doc dùng doc_id;
+calc dùng expression. Không đặt tham số cạnh tool, không đoán mã tài liệu.
 
-B. DÒNG KẾT LUẬN.
-   Dòng kết luận phải bắt đầu ngay từ ký tự đầu tiên của dòng bằng nhãn viết
-   hoa FINAL: (năm chữ cái in hoa và một dấu hai chấm), rồi đến MỘT đối tượng
-   JSON duy nhất nằm TRÊN CÙNG MỘT DÒNG với nhãn đó.
-   Không xuống dòng bên trong JSON. Không thụt đầu dòng. Không bọc trong dấu
-   nháy ngược hay khối mã. Không in đậm nhãn. Chỉ dùng dấu nháy kép thẳng
-   ASCII, không dùng nháy cong. Không có dấu phẩy thừa. Sau dòng kết luận
-   không viết thêm bất cứ ký tự nào.
+FINAL: Khi đủ bằng chứng, chốt ngay. FINAL: phải bắt đầu ở đầu dòng, theo sau
+là một object JSON trên cùng dòng, không markdown, nháy cong hay dấu phẩy thừa.
+Có answer tiếng Việt trả lời thẳng câu hỏi (<600 ký tự), citations (mảng mã),
+abstain (boolean), claims (tối đa 4 object có text/doc_id). Không chép giao thức.
 
-C. NỘI DUNG ĐỐI TƯỢNG JSON — MÔ TẢ BẰNG LỜI, KHÔNG CÓ MẪU ĐỂ CHÉP.
-   Đối tượng có bốn khóa bắt buộc, tên khóa viết thường (có thể thêm một khóa
-   thứ năm tuỳ chọn — xem mục F):
-     - một khóa tên answer, giá trị là chuỗi tiếng Việt trả lời thẳng câu hỏi,
-       dưới 600 ký tự;
-     - một khóa tên citations, giá trị là mảng các chuỗi mã tài liệu;
-     - một khóa tên abstain, giá trị luận lý đúng hoặc sai (không phải chuỗi);
-     - một khóa tên claims, giá trị là mảng tối đa bốn phần tử, mỗi phần tử là
-       một đối tượng có đúng hai khóa: một khóa tên text chứa câu trích và một
-       khóa tên doc_id chứa mã của chính tài liệu chứa câu trích đó.
-   Mã tài liệu luôn có dạng doc- rồi ĐÚNG BỐN CHỮ SỐ, ví dụ doc-0004. Không
-   tự bịa mã, không rút gọn thành doc-4.
-   Tuyệt đối không chép lại phần mô tả định dạng này vào câu trả lời.
+QUOTE: text là một đoạn LIÊN TỤC nguyên văn trong MỘT DÒNG nguồn đã đọc.
+Giữ nguyên cả chữ hoa/thường, dấu câu, khoảng trắng; không viết hoa lại đầu
+đoạn, không diễn giải, không ghép các dòng/nguồn. Khi dòng nghiệp vụ liên quan
+dài không quá 400 ký tự, trích TRỌN DÒNG đó vào một claim, không chia từng câu.
+Giữ mọi vế, kể cả phần phạm vi hoặc điều kiện bên cạnh nội dung
+được hỏi. Một claim có thể gồm nhiều câu. Giữ thời hạn, tỷ lệ ngoại lệ, điều
+kiện áp dụng cùng nhau trong MỘT claim, không chia từng điều kiện thành các
+claim riêng. Không cắt giữa câu hoặc ở dấu chấm phẩy. Nếu đoạn dài hơn 400 ký
+tự, bỏ metadata ở hai đầu và chọn đoạn liên tục đủ nội dung; không nối phần rời.
 
-D. MỖI PHẦN TỬ claims LÀ MỘT CÂU CHÉP NGUYÊN VĂN.
-   Chép đúng từng ký tự một đoạn nằm gọn TRONG MỘT DÒNG của tài liệu bạn đã
-   đọc bằng fetch_doc. Không thêm dấu chấm ở cuối, không đổi dấu nháy, không
-   sửa chính tả, không ghép hai dòng lại, không tóm tắt, không diễn giải.
-   Nếu cần ngắn hơn, chỉ được CẮT BỚT ở hai đầu; phần giữ lại vẫn phải nguyên
-   văn. Mỗi câu trích không quá 400 ký tự. Cắt bớt là hợp lệ, viết lại thì mất
-   điểm.
-
-E. KẾT THÚC SỚM.
-   Mỗi lượt chỉ gọi đúng một công cụ. Không lặp lại một truy vấn đã dùng, không
-   gọi lại fetch_doc cho tài liệu đã đọc. Ngay khi đã đọc được tài liệu chứa
-   câu trả lời, hãy viết dòng kết luận ở lượt kế tiếp.
-
-F. KHI CÂU HỎI YÊU CẦU CHỌN MỘT KẾT LUẬN.
-   Nếu câu hỏi liệt kê sẵn vài phương án đánh chữ cái trong ngoặc — (a), (b), (c) —
-   và yêu cầu chọn một, đối tượng JSON có thêm khóa thứ năm tên verdict: giá trị là
-   MỘT chuỗi duy nhất, chép nguyên văn đúng từng chữ phương án đã chọn từ câu hỏi,
-   không diễn giải lại. Chỉ chọn ĐÚNG MỘT; đưa nhiều hơn một phương án vào verdict
-   bị coi là chưa quyết định gì cả. Trường answer vẫn phải trả lời đầy đủ câu hỏi
-   như bình thường. Câu hỏi không liệt kê phương án nào thì bỏ hẳn khóa verdict."""
+QUYẾT ĐỊNH: Nếu nguồn thiếu số liệu được hỏi, giữ quote xác nhận thiếu dữ liệu
+và abstain=true. Nếu nguồn mâu thuẫn chưa phân giải, trích cả hai phía, giải
+thích bất định. Khi câu hỏi yêu cầu chọn phương án (a)/(b)/(c), thêm verdict
+chép nguyên văn đúng MỘT phương án được bằng chứng đỡ; không tự đoán kết luận.
+Khi nhận feedback FINAL, tự sửa bằng quote đã quan sát. Khi được nudge chốt
+vì ngân sách, dùng bằng chứng hiện có và abstain nếu thiếu, kể cả chưa fetch."""
 
 
 def real_model_system_prompt(base: str = ARENA_SYSTEM_PROMPT) -> str:
@@ -503,6 +483,8 @@ class ReActAgent:
         self.last_context = ctx
         self._final_deferrals = 0
         self._refused_final = None
+        ctx.state["evidence_by_doc"] = {}
+        ctx.state["real_model_features"] = "PHỤ LỤC GIAO THỨC" in self.system_prompt
 
         self.trace.emit("agent_start", brief_id=str(brief.get("brief_id", "")))
 
@@ -532,10 +514,29 @@ class ReActAgent:
                 )
 
             parsed = self._parse(text)
+            if parsed.kind != "final":
+                parsed = self._prepare_action(ctx, text, parsed)
             ctx.messages.append({"role": "assistant", "content": text})
 
             if parsed.kind == "final":
                 report = parsed.final if isinstance(parsed.final, dict) else {}
+                reviewer = ctx.state.get("final_reviewer")
+                if (ctx.state.get("real_model_features") and callable(reviewer)
+                        and not ctx.state.get("final_repairs") and step + 1 < self.max_steps):
+                    issues = reviewer(ctx, report)
+                    self.trace.emit("layer", layer="critic", hook="final_review",
+                                    issues=len(issues), reason="; ".join(issues)[:500])
+                    if issues:
+                        from harness.layers.budget_policy import can_repair_final
+                        if can_repair_final(ctx):
+                            ctx.state["final_repairs"] = 1
+                            ctx.messages.append({"role": "user", "content":
+                                "Kiểm tra FINAL trước khi submit: " + " ".join(issues)
+                                + " Hãy tự viết lại FINAL đúng giao thức, bằng quote nguyên văn đã quan sát; "
+                                  "không bịa hoặc ghép nguồn. Chỉ có một lượt sửa FINAL."})
+                            continue
+                        self.trace.emit("layer", layer="critic", hook="final_repair_skipped",
+                                        reason="estimated_token_budget")
                 ctx.stop_reason = "final"
                 break
 
@@ -617,6 +618,60 @@ class ReActAgent:
 
     # -- the model -----------------------------------------------------
 
+    def _prepare_action(self, ctx, text, parsed):
+        """Normalize only unambiguous ACTION arguments, then use the frozen codec.
+
+        Neither the raw response/history nor any FINAL is rewritten.
+        """
+        # Read ACTION lines from the original turn: FINAL canonicalization
+        # deliberately drops an ACTION beneath a quoted/refused FINAL.
+        lines = [line.lstrip() for line in text.splitlines()
+                 if line.lstrip().startswith("ACTION:")]
+        error = None
+        repaired = False
+        if len(lines) != 1:
+            error = "Cần đúng một ACTION với tool và args trên cùng dòng."
+        else:
+            try:
+                payload = json.loads(lines[0][len("ACTION:"):].strip())
+            except (ValueError, TypeError):
+                payload = None
+            fields = {"search": {"query", "k"}, "fetch_doc": {"doc_id"}, "calc": {"expression"}}
+            if (not isinstance(payload, dict) or not isinstance(payload.get("tool"), str)
+                    or payload["tool"] not in fields):
+                error = "Tool phải là search, fetch_doc hoặc calc trong một object JSON."
+            else:
+                name = payload["tool"]
+                allowed = fields[name]
+                outer = {key: payload[key] for key in allowed if key in payload}
+                args = payload.get("args")
+                if set(payload) - allowed - {"tool", "args"}:
+                    error = "ACTION có trường không được hỗ trợ."
+                elif "args" in payload and not isinstance(args, dict):
+                    error = "args phải là object JSON."
+                elif isinstance(args, dict) and (set(args) - allowed or any(
+                    key not in args or type(args[key]) is not type(value) or args[key] != value
+                    for key, value in outer.items()
+                )):
+                    error = "Tham số args và top-level mâu thuẫn hoặc có trường không được hỗ trợ."
+                else:
+                    repaired = "args" not in payload and bool(outer)
+                    args = args if isinstance(args, dict) else outer
+                    error = _action_error(name, args)
+                    if error is None:
+                        parsed = parse_output("ACTION: " + json.dumps(
+                            {"tool": name, "args": args}, ensure_ascii=False))
+        if error is not None:
+            ctx.state["action_error"] = error
+            ctx.state["protocol_errors"] = ctx.state.get("protocol_errors", 0) + 1
+            self.trace.emit("layer", layer="agent_protocol", hook="action_rejected", reason=error)
+            return parse_output("")
+        ctx.state["protocol_errors"] = 0
+        if repaired:
+            ctx.state["action_repairs"] = ctx.state.get("action_repairs", 0) + 1
+            self.trace.emit("layer", layer="agent_protocol", hook="action_repaired", tool=parsed.tool)
+        return parsed
+
     def _call_model(self, messages: list[dict]):
         """The innermost model call — what `wrap_model_call` wraps.
 
@@ -627,6 +682,14 @@ class ReActAgent:
         stamped from their return value would prove nothing at all.
         """
         response = self.model.complete(messages)
+        ctx = self.last_context
+        if ctx is not None:
+            prompt = max(0, int(response.prompt_tokens))
+            completion = max(0, int(response.completion_tokens))
+            ctx.state["model_tokens"] = ctx.state.get("model_tokens", 0) + prompt + completion
+            ctx.state["last_prompt_tokens"] = prompt
+            ctx.state["last_completion_tokens"] = completion
+            ctx.state["last_prompt_chars"] = sum(len(str(m.get("content", ""))) for m in messages)
         # A frozen runner may take over `model_call` emission (it is the
         # only way to make the record unforgeable). It announces that by
         # setting `emits_model_call = True` on the model object.
@@ -653,16 +716,173 @@ class ReActAgent:
             # Not a THOUGHT/ACTION turn and not a FINAL either. Say so
             # rather than guessing — a real model that drifts off the
             # protocol needs to be told, and the mock never gets here.
+            detail = ctx.state.pop("action_error", "không đọc được ACTION")
+            nudge = (f" Hãy chốt FINAL bằng bằng chứng đã có. {FINALIZE_SENTINEL}"
+                     if ctx.state.get("protocol_errors", 0) >= 3 else "")
             return (
                 f"{TOOL_ERROR_PREFIX} không đọc được ACTION. Hãy trả lời đúng định dạng "
-                "THOUGHT/ACTION hoặc THOUGHT/FINAL."
+                f"THOUGHT/ACTION hoặc THOUGHT/FINAL. {detail} "
+                'ACTION dùng tool và args: search có query/k, fetch_doc có doc_id, calc có expression.'
+                + nudge
             )
 
+        error = _action_error(parsed.tool, parsed.args)
+        if error:
+            return f"{TOOL_ERROR_PREFIX} validation: {error}"
+        if ctx.state.get("priority_fetch_step") == ctx.step:
+            if parsed.tool != "fetch_doc" or parsed.args.get("doc_id") not in ctx.state.get("pending_policy_sources", ()):
+                return (f"{TOOL_ERROR_PREFIX} Lượt cuối chỉ dành cho fetch một văn bản chính thức "
+                        "đã có trong kết quả search; không tiếp tục search. Sau đó chốt FINAL.")
+        key = None
+        if ctx.state.get("real_model_features") and parsed.tool in ("search", "fetch_doc"):
+            key = (parsed.tool, parsed.args["doc_id"]) if parsed.tool == "fetch_doc" else (
+                parsed.tool, " ".join(parsed.args["query"].casefold().split()), _as_k(parsed.args.get("k")))
+            if key in ctx.state.get("successful_actions", set()):
+                ctx.state["duplicates_skipped"] = ctx.state.get("duplicates_skipped", 0) + 1
+                self.trace.emit("layer", layer="agent_retrieval", hook="duplicate_skipped", tool=parsed.tool)
+                return ("Công cụ này đã thành công và bằng chứng còn trong lịch sử. "
+                        "Hãy dùng bằng chứng đó, đọc ứng viên chưa đọc hoặc đổi khái niệm truy vấn; "
+                        "không lặp lại cùng ACTION.")
         call = tool_call if tool_call is not None else self.middleware.wrap_tool_call(ctx, self._dispatch)
         result = call(parsed.tool, dict(parsed.args))
         if result is None or not hasattr(result, "ok"):
             return f"{TOOL_ERROR_PREFIX} layer trả về kết quả không hợp lệ cho {parsed.tool}"
+        if result.ok:
+            content = result.content
+            if ctx.state.get("real_model_features") and parsed.tool == "search":
+                content = self._focus_search(ctx, content)
+            self._record_evidence(ctx, parsed.tool, parsed.args, content)
+            if key is not None and not is_degraded(result.content):
+                ctx.state.setdefault("successful_actions", set()).add(key)
+                if parsed.tool == "search":
+                    ctx.state["searches_since_fetch"] = ctx.state.get("searches_since_fetch", 0) + 1
+                elif parsed.tool == "fetch_doc":
+                    ctx.state["searches_since_fetch"] = 0
+            if ctx.state.get("real_model_features") and parsed.tool == "search":
+                hint = self._source_hint(ctx, parsed.args, content)
+                if hint:
+                    return content + "\n\n" + hint
+            if ctx.state.get("real_model_features") and parsed.tool == "fetch_doc":
+                hint = self._fetch_hint(parsed.args["doc_id"], result.content)
+                if hint:
+                    return result.content + "\n\n" + hint
+            return content
         return result.content if result.ok else f"{TOOL_ERROR_PREFIX} {result.error}"
+
+    def _focus_search(self, ctx, content):
+        """For policy lookup, deliver a title catalog; fetch carries the evidence.
+
+        Existing history is never shortened. This only selects which fields of
+        the incoming result are delivered, before indexing its evidence.
+        """
+        if not self._policy_question(ctx.question):
+            return content
+        try:
+            entries = json.loads(content)
+        except (ValueError, TypeError):
+            return content
+        if not isinstance(entries, list) or not all(
+            isinstance(e, dict) and isinstance(e.get("doc_id"), str)
+            and isinstance(e.get("title"), str) and isinstance(e.get("snippet"), str)
+            for e in entries
+        ):
+            return content
+        catalog = [{"doc_id": e["doc_id"], "title": e["title"], "snippet": ""} for e in entries]
+        self.trace.emit("layer", layer="agent_retrieval", hook="policy_catalog",
+                        documents=len(catalog), deferred_snippets=len(catalog))
+        return json.dumps(catalog, ensure_ascii=False)
+
+    @staticmethod
+    def _policy_question(question):
+        return bool(re.search(r"theo quy định|theo chính sách|chính sách .*chung|quy định .*phải", question.casefold()))
+
+    def _source_hint(self, ctx, args, content):
+        """Recommend document kind using only titles in this delivered search."""
+        if not self._policy_question(ctx.question):
+            return ""
+        try:
+            entries = json.loads(content)
+        except (ValueError, TypeError):
+            return ""
+        if not isinstance(entries, list):
+            return ""
+        valid = [e for e in entries if isinstance(e, dict) and isinstance(e.get("title"), str)
+                 and isinstance(e.get("doc_id"), str)]
+        official = [e for e in valid if "văn bản chính thức" in e["title"].casefold()]
+        ctx.state["pending_policy_sources"] = tuple(
+            e["doc_id"] for e in official
+            if ("fetch_doc", e["doc_id"]) not in ctx.state.get("successful_actions", set())
+        )
+        if official:
+            candidates = "; ".join(f'{e["doc_id"]}: {e["title"]}' for e in official)
+            self.trace.emit("layer", layer="agent_retrieval", hook="source_kind_hint", candidates=len(official))
+            return ("Câu hỏi yêu cầu quy định chung. Ưu tiên fetch văn bản chính thức đúng chủ đề "
+                    "trước Báo cáo/Hỏi & Đáp/Ghi chú. CHỈ đọc nếu chủ đề phù hợp; nếu các tiêu đề "
+                    "khác lĩnh vực đang hỏi, hãy gọi tên LĨNH VỰC nghiệp vụ theo nghĩa của sự việc "
+                    "và đổi query sang tên đó, không lặp mô tả triệu chứng trong ticket. "
+                    "Ứng viên chính thức trong kết quả vừa giao: " + candidates)
+        if valid and _as_k(args.get("k")) < MAX_SEARCH_K:
+            self.trace.emit("layer", layer="agent_retrieval", hook="source_kind_expand", candidates=0)
+            return ("Câu hỏi yêu cầu quy định nhưng nhóm kết quả này chưa có Văn bản chính thức. "
+                    "Đừng đọc lần lượt Báo cáo/Hỏi & Đáp/Ghi chú để suy ra quy định. "
+                    "Hãy search lại với k=10 theo CHỦ ĐỀ trong tiêu đề đã thấy, rồi fetch "
+                    "Văn bản chính thức cùng chủ đề. Đây là mở rộng phạm vi, không phải lặp search cùng k.")
+        return ""
+
+    def _fetch_hint(self, doc_id, content):
+        """Highlight whole substantive lines from this successful delivered fetch.
+
+        No corpus lookup or report construction: the model chooses and writes
+        its quotations. Structured section headings only locate source context.
+        """
+        if not isinstance(content, str) or is_degraded(content):
+            return ""
+        lines = content.splitlines()
+        candidates = []
+        for i, line in enumerate(lines):
+            if re.match(r"\s*\d+\.\s*Nội dung chính", line, re.I):
+                candidates = next(([candidate] for candidate in lines[i + 1:]
+                                   if candidate.strip()), [])
+                break
+        if not candidates:
+            metadata = re.compile(r"^(?:Công ty|Chủ đề:|Số hiệu:|Người |Phiên bản|\d+\.)", re.I)
+            candidates = [line for line in lines if len(line) >= 70 and not metadata.match(line)]
+        candidates = [line for line in candidates if len(line) <= 400 and "[" not in line][:3]
+        if not candidates:
+            return ""
+        return (f"Ngữ cảnh nghiệp vụ vừa giao từ {doc_id}. Khi dùng một dòng dưới đây, "
+                "hãy trích TRỌN DÒNG vào một claim, kể cả câu/vế sau; không cắt ở dấu chấm "
+                "và không chia điều kiện thành nhiều claim. Model tự chọn dòng liên quan và "
+                "viết FINAL; không trích hướng dẫn này.\n" + "\n".join(f"«{line}»" for line in candidates))
+
+    def _record_evidence(self, ctx, name, args, content):
+        """Index exactly the final sanitized tool output delivered to the model."""
+        if not isinstance(content, str):
+            return
+        fragments = []
+        if name == "fetch_doc":
+            # Noise is not evidence; truncated results can still contain clean quotes.
+            if "[NOISE:" not in content:
+                fragments.append((args["doc_id"], content))
+        elif name == "search":
+            try:
+                entries = json.loads(content)
+            except ValueError:
+                entries = None
+            if isinstance(entries, list):
+                for entry in entries:
+                    if (isinstance(entry, dict) and isinstance(entry.get("doc_id"), str)
+                            and entry["doc_id"] and isinstance(entry.get("title"), str)
+                            and isinstance(entry.get("snippet"), str)):
+                        fragments.append((entry["doc_id"], entry["snippet"]))
+        index = ctx.state.setdefault("evidence_by_doc", {})
+        for doc_id, fragment in fragments:
+            delivered = index.setdefault(doc_id, [])
+            if fragment and fragment not in delivered:
+                delivered.append(fragment)
+        if fragments:
+            self.trace.emit("layer", layer="agent_evidence", hook="observation",
+                            sources=len(index), fragments=sum(map(len, index.values())))
 
     def _dispatch(self, name: str, args: dict) -> ToolResult:
         """The innermost tool call — what `wrap_tool_call` wraps."""
@@ -678,6 +898,19 @@ class ReActAgent:
 
 def _as_text(value) -> str:
     return value if isinstance(value, str) else ("" if value is None else str(value))
+
+
+def _action_error(name, args):
+    required = {"search": "query", "fetch_doc": "doc_id", "calc": "expression"}
+    if name not in required or not isinstance(args, dict):
+        return "Tool hoặc args không hợp lệ."
+    value = args.get(required[name])
+    if not isinstance(value, str) or not value.strip():
+        return f"{name} cần {required[name]} là chuỗi không rỗng trong args."
+    k = args.get("k", 5)
+    if name == "search" and (isinstance(k, bool) or not isinstance(k, int) or k < 1):
+        return "search.k phải là số nguyên dương (tối đa 10)."
+    return None
 
 
 def _as_k(value) -> int:

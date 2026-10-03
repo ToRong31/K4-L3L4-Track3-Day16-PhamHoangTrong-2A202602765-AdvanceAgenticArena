@@ -97,5 +97,13 @@ class Retry(Middleware):
             attempts += 1
             if result.ok and not is_degraded(result.content):
                 break
+            error = (result.error or "").lower()
+            if not result.ok and error.startswith((
+                "doc not found", "invalid expression", "unknown tool", "validation:"
+            )):
+                break
         ctx.state["retry_attempts"] = ctx.state.get("retry_attempts", 0) + max(0, attempts - 1)
+        if ctx.trace is not None and (attempts > 1 or not result.ok):
+            ctx.trace.emit("layer", layer=self.name, hook="wrap_tool_call",
+                           attempts=attempts, reason="degraded" if result.ok else str(result.error)[:160])
         return result

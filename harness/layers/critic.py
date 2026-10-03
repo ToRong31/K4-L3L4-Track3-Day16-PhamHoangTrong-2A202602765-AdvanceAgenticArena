@@ -70,9 +70,12 @@ Xem `harness/middleware.py` để biết thứ tự các hook.
 
 from __future__ import annotations
 
+import re
+
 from arena.corpus import INJECTION_CANARY
 
 from harness.middleware import Middleware
+from harness.layers.citation_checker import evidence_sources
 
 
 class Critic(Middleware):
@@ -80,20 +83,69 @@ class Critic(Middleware):
 
     name = "critic"
 
+    def before_agent(self, ctx):
+        ctx.state["final_reviewer"] = self.review_final
+
+    def review_final(self, ctx, report):
+        """Report observable defects only; the same model writes the correction."""
+        claims = report.get("claims")
+        claims = claims if isinstance(claims, list) else []
+        supported = []
+        issues = []
+        for claim in claims:
+            text = claim.get("text") if isinstance(claim, dict) else None
+            if (not isinstance(text, str) or INJECTION_CANARY in text
+                    or not evidence_sources(ctx, text)):
+                issues.append("Có claim không khớp đoạn nguyên văn đã giao từ một dòng nguồn; "
+                              "đối chiếu từng ký tự và giữ nguyên chữ hoa/thường ở đầu đoạn; "
+                              "đọc toàn văn nếu snippet bị cắt, hoặc bỏ claim đó.")
+                break
+        for claim in claims:
+            if isinstance(claim, dict) and isinstance(claim.get("text"), str):
+                text = claim["text"]
+                sources = evidence_sources(ctx, text)
+                if INJECTION_CANARY not in text and sources:
+                    supported.append(text)
+                    # A short, fully delivered multi-clause line is stronger context
+                    # than separate fragments. Ask the model; never splice its text.
+                    index = ctx.state.get("evidence_by_doc", {})
+                    for doc in getattr(ctx.corpus, "docs", ()):
+                        if doc.doc_id not in sources:
+                            continue
+                        full_line = next((line for line in doc.body.splitlines()
+                                          if text in line and text != line and len(line) <= 400
+                                          and (". " in line or ";" in line)
+                                          and INJECTION_CANARY not in line
+                                          and any(line in fragment for fragment in index.get(doc.doc_id, ()))), None)
+                        if full_line is not None:
+                            if not any("trọn dòng" in issue for issue in issues):
+                                issues.append("Quote đang cắt một dòng có nhiều câu/vế đã được giao đầy đủ "
+                                              "và ngắn hơn 400 ký tự. Hãy tự trích trọn dòng nghiệp vụ "
+                                              "đó thành một claim để giữ đủ ngữ cảnh, không chia các vế. "
+                                              f"Ngữ cảnh đã có từ {doc.doc_id}: «{full_line}»")
+                            break
+        if not supported and not report.get("abstain"):
+            issues.append("Không có claim được bằng chứng đỡ; kiểm tra nguồn và abstain nếu không đủ căn cứ.")
+        question = ctx.question.casefold()
+        options = bool(re.search(r"\([a-z]\)", question))
+        needs_verdict = "verdict" in question or (options and bool(re.search(r"chọn|kết luận", question)))
+        if needs_verdict and (not isinstance(report.get("verdict"), str)
+                              or not report["verdict"].strip() or report["verdict"].strip() in ("...", "…")):
+            issues.append("Câu hỏi yêu cầu chọn kết luận; hãy thêm verdict chép đúng một phương án "
+                          "nếu bằng chứng cho phép quyết định, hoặc giải thích vì sao phải abstain.")
+        numeric_need = bool(re.search(r"số liệu|chỉ số|hiệu suất|bao nhiêu|mấy|số (?:vụ|lượng|trường hợp)", question))
+        absence = any(re.search(r"chưa (?:được )?(?:đồng bộ|có|cập nhật)|không có (?:dữ liệu|số liệu)",
+                                text.casefold()) for text in supported)
+        if numeric_need and absence and not report.get("abstain"):
+            issues.append("Quote nói dữ liệu chưa có/đồng bộ trong khi đang hỏi số liệu; "
+                          "kiểm tra lại khả năng trả lời và đặt abstain phù hợp, giữ quote thiếu dữ liệu.")
+        return issues
+
     def after_agent(self, ctx, report):
         raw_claims = report.get("claims")
         claims = raw_claims if isinstance(raw_claims, list) else []
-        observed = ctx.observed_text
-        docs = sorted(
-            (doc for doc in getattr(ctx.corpus, "docs", ())
-             if doc.body and doc.body in observed),
-            key=lambda doc: doc.doc_id,
-        )
-
         def sources(text):
-            return [doc.doc_id for doc in docs
-                    if text and text in observed
-                    and any(text in line for line in doc.body.splitlines())]
+            return evidence_sources(ctx, text)
 
         kept = []
         split = False
@@ -116,7 +168,7 @@ class Critic(Middleware):
                                  {**claim, "text": right, "doc_id": pair[1]}))
                     split = True
                     break
-                offset = text.find(" và ", offset + 4)
+                offset = text.find(" và ", offset + 1)
 
         result = {**report, "claims": kept,
                   "citations": sorted({claim["doc_id"] for claim in kept})}

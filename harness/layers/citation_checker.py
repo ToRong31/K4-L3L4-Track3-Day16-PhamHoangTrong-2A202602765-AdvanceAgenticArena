@@ -35,8 +35,9 @@ Hai điều kiện loại trừ nhau nên hai lớp không giành điểm của 
 CHỈ ĐƯỢC GẮN VÀO TÀI LIỆU ĐÃ QUAN SÁT. Trích một tài liệu mà lượt chạy
 chưa từng đọc bị chấm `UNRETRIEVED`. Vì vậy hãy tìm nguồn trong
 `ctx.observed_text`, đừng quét cả corpus rồi gắn bừa: điều kiện
-`doc.body in ctx.observed_text` nghĩa là "tài liệu này đã về nguyên vẹn
-từ một lần fetch sạch" — một đoạn snippet hay một bản bị cắt không tính.
+Ở caller cũ không có chỉ mục, `doc.body in ctx.observed_text` là fallback
+bảo thủ. Agent hiện tại ghi fragment đúng doc_id sau guard; snippet hoặc
+bản bị cắt chỉ đỡ đoạn nguyên văn đã giao, không đỡ phần nguồn chưa đọc.
 
 CÔNG CỤ CÓ SẴN:
     ctx.observed_text  -> toàn bộ quan sát agent đã thấy, nối lại
@@ -62,6 +63,26 @@ from __future__ import annotations
 from harness.middleware import Middleware
 
 
+def evidence_sources(ctx, text):
+    """Verify a literal quote against delivered fragments and one corpus line.
+
+    Legacy callers without an index retain the conservative full-body check.
+    An initialized but empty index proves that no source was delivered.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return []
+    index = ctx.state.get("evidence_by_doc")
+    indexed = "evidence_by_doc" in ctx.state
+    sources = []
+    for doc in sorted(getattr(ctx.corpus, "docs", ()), key=lambda d: d.doc_id):
+        fragments = index.get(doc.doc_id, ()) if indexed and isinstance(index, dict) else ()
+        delivered = (any(text in fragment for fragment in fragments)
+                     if indexed else bool(doc.body and doc.body in ctx.observed_text))
+        if delivered and any(text in line for line in doc.body.splitlines()):
+            sources.append(doc.doc_id)
+    return sources
+
+
 class CitationChecker(Middleware):
     """Trỏ mỗi claim về đúng tài liệu thật sự chứa câu đó."""
 
@@ -71,19 +92,12 @@ class CitationChecker(Middleware):
         claims = report.get("claims")
         if not isinstance(claims, list):
             return report
-        observed = ctx.observed_text
-        docs = sorted(
-            (doc for doc in getattr(ctx.corpus, "docs", ())
-             if doc.body and doc.body in observed),
-            key=lambda doc: doc.doc_id,
-        )
         fixed = []
         for claim in claims:
             if not isinstance(claim, dict) or not isinstance(claim.get("text"), str) or not claim["text"].strip():
                 fixed.append(claim)
                 continue
-            sources = [doc.doc_id for doc in docs
-                       if any(claim["text"] in line for line in doc.body.splitlines())]
+            sources = evidence_sources(ctx, claim["text"])
             if sources and claim.get("doc_id") not in sources:
                 claim = {**claim, "doc_id": sources[0]}
             fixed.append(claim)

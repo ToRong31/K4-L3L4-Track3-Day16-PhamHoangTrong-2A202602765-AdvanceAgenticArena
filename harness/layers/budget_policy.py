@@ -78,22 +78,79 @@ NUDGE = (
 )
 
 
+def token_estimate(ctx, messages=None):
+    """Soft forecast from actual prior usage and context growth, not a hard cap."""
+    messages = ctx.messages if messages is None else messages
+    previous = ctx.state.get("last_prompt_tokens", 0)
+    previous_chars = ctx.state.get("last_prompt_chars", 0)
+    chars = sum(len(str(message.get("content", ""))) for message in messages)
+    ratio = previous / previous_chars if previous_chars else 0.5
+    prompt = previous + int(max(0, chars - previous_chars) * ratio + 0.999)
+    if not previous:
+        prompt = int(chars * ratio + 0.999)
+    completion = max(512, min(1500, ctx.state.get("last_completion_tokens", 0)))
+    return prompt + completion
+
+
+def can_repair_final(ctx):
+    limit = ctx.budget.get("max_tokens")
+    if isinstance(limit, bool) or not isinstance(limit, (int, float)):
+        return True
+    # Reserve a little room for the repair feedback itself.
+    return ctx.state.get("model_tokens", 0) + token_estimate(ctx) + 256 <= limit
+
+
 class BudgetPolicy(Middleware):
     """Ép mô hình chốt FINAL ngay khi ngân sách công cụ đã tiêu hết."""
 
     name = "budget_policy"
 
-    def __init__(self, reserve: int = DEFAULT_RESERVE) -> None:
+    def __init__(self, reserve: int = DEFAULT_RESERVE, token_headroom: float = 0.1) -> None:
         self.reserve = max(0, int(reserve))
+        # Usage forecasting is soft. A small tolerance permits a useful last
+        # fetch when conservative completion reserves would otherwise stop it.
+        self.token_headroom = max(0.0, min(0.2, float(token_headroom)))
 
     def _spent(self, ctx) -> bool:
         limit = ctx.max_tool_calls
         return limit is not None and ctx.tools.calls >= limit - self.reserve
 
     def before_model(self, ctx, messages):
-        if not self._spent(ctx):
-            return messages
-        return messages + [{"role": "user", "content": NUDGE}]
+        if self._spent(ctx):
+            return messages + [{"role": "user", "content": NUDGE}]
+        if ctx.state.get("real_model_features"):
+            if "priority_fetch_step" in ctx.state and ctx.step > ctx.state["priority_fetch_step"]:
+                return messages + [{"role": "user", "content": NUDGE}]
+            limit = ctx.budget.get("max_tokens")
+            estimate = token_estimate(ctx, messages)
+            ctx.state["next_token_estimate"] = estimate
+            if (isinstance(limit, (int, float)) and not isinstance(limit, bool)
+                    and ctx.state.get("model_tokens", 0) + 2 * estimate >= limit * (1 + self.token_headroom)):
+                if (ctx.state.get("pending_policy_sources") and "priority_fetch_step" not in ctx.state
+                        and ctx.state.get("model_tokens", 0) + estimate <= limit * (1 + self.token_headroom)):
+                    ctx.state["priority_fetch_step"] = ctx.step
+                    if ctx.trace is not None:
+                        ctx.trace.emit("layer", layer=self.name, hook="priority_fetch",
+                                       candidates=len(ctx.state["pending_policy_sources"]),
+                                       spent=ctx.state.get("model_tokens", 0), estimated_next=estimate)
+                    return messages + [{"role": "system", "content":
+                        "Chỉ còn một lượt đọc nguồn trước FINAL. Kết quả search đã có ứng viên "
+                        "Văn bản chính thức; chọn đúng chủ đề và fetch_doc NGAY, không search thêm. "
+                        "Sau fetch phải chốt FINAL bằng quote nguyên dòng vừa đọc. "
+                        "Nếu không có ứng viên phù hợp thì abstain, không đoán."}]
+                if ctx.trace is not None:
+                    ctx.trace.emit("layer", layer=self.name, hook="token_nudge",
+                                   spent=ctx.state.get("model_tokens", 0), estimated_next=estimate)
+                return messages + [{"role": "user", "content":
+                    "Ngân sách token gần hết; chốt FINAL ngay bằng bằng chứng hiện có, "
+                    f"abstain nếu thiếu căn cứ, không gọi thêm công cụ. {FINALIZE_SENTINEL}"}]
+            if ctx.state.get("searches_since_fetch", 0) >= 2:
+                return messages + [{"role": "system", "content":
+                    "Bạn đã search liên tiếp mà chưa đọc nguồn. Hãy đối chiếu TIÊU ĐỀ với "
+                    "chủ đề nghiệp vụ và loại văn bản được hỏi, đọc ứng viên phù hợp; "
+                    "nếu chưa có, đổi sang tên quy trình/chính sách nội bộ và mở rộng k=8–10. "
+                    "Không tiếp tục lặp mô tả sự việc bằng từ đồng nghĩa."}]
+        return messages
 
     def wrap_tool_call(self, ctx, call, name, args):
         if self._spent(ctx):
