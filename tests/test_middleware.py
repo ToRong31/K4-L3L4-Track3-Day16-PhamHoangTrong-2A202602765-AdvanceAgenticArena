@@ -290,8 +290,17 @@ def test_logging_middleware_records_every_hook_and_changes_nothing():
         "wrap_tool_call",
         "after_agent",
     } <= set(logger.events)
-    layers = [e for e in _events(logged_jsonl) if e["event"] == "layer"]
-    assert layers and all(e["layer"] == "logging" for e in layers)
+    layers = [e for e in _events(logged_jsonl)
+              if e["event"] == "layer" and e["layer"] == "logging"]
+    assert [e["hook"] for e in layers] == logger.events
+    # The agent also records evidence events without LoggingMiddleware.
+    # Adding the logger must preserve those and every other baseline event.
+    def without_logging(jsonl):
+        return [{key: value for key, value in event.items() if key != "seq"}
+                for event in _events(jsonl)
+                if not (event["event"] == "layer" and event.get("layer") == "logging")]
+
+    assert without_logging(logged_jsonl) == without_logging(plain_jsonl)
     # Logging is free: `layer` events are ignored by the scorer.
     a = score_run(BRIEF_SLA, plain, trace_jsonl=plain_jsonl, corpus=CORPUS).total
     b = score_run(BRIEF_SLA, logged, trace_jsonl=logged_jsonl, corpus=CORPUS).total

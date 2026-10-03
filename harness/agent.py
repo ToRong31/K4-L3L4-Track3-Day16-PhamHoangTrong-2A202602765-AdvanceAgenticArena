@@ -205,8 +205,13 @@ _FINAL_MARKER = "FINAL:"
 #: Vietnamese instruction is what keeps a Vietnamese answer on-language.
 REAL_MODEL_PROMPT_ADDENDUM = """PHỤ LỤC GIAO THỨC — BẮT BUỘC. Phụ lục này thắng khi có mâu thuẫn.
 
-TRUY XUẤT: Bắt đầu bằng search, rồi fetch_doc ứng viên đúng chủ đề để đọc
-nguồn. TRƯỚC search, THOUGHT xác định LĨNH VỰC NGHIỆP VỤ bằng thuật ngữ chuẩn
+TRUY XUẤT: Khi ngân sách cho phép, Lượt đầu tiên của bạn luôn luôn là một ACTION gọi search.
+Không được kết luận ở lượt đầu tiên khi còn ngân sách truy xuất.
+Chỉ được đặt abstain thành đúng (true) sau khi đã gọi search và fetch_doc
+ứng viên đúng chủ đề để đọc nguồn, trừ khi ngân sách buộc chốt sớm.
+Nếu kết quả thiếu bằng chứng và còn ngân sách, diễn đạt lại query bằng thuật
+ngữ nghiệp vụ rồi tìm lại ít nhất một lần nữa trước khi abstain.
+TRƯỚC search, THOUGHT xác định LĨNH VỰC NGHIỆP VỤ bằng thuật ngữ chuẩn
 thường dùng cho hoạt động đó. Query dùng tên lĩnh vực/chính sách, không chép
 mô tả triệu chứng, sự cố hoặc từ ngữ của ticket. Tách nhu cầu chính khỏi sự việc nền. Tìm theo tên quy trình/chính sách
 nghiệp vụ, dùng tiêu đề kết quả để đổi sang thuật ngữ nội bộ. Quy định chung
@@ -218,7 +223,11 @@ ACTION có tool và object args: search dùng query/k; fetch_doc dùng doc_id;
 calc dùng expression. Không đặt tham số cạnh tool, không đoán mã tài liệu.
 
 FINAL: Khi đủ bằng chứng, chốt ngay. FINAL: phải bắt đầu ở đầu dòng, theo sau
-là một object JSON trên cùng dòng, không markdown, nháy cong hay dấu phẩy thừa.
+là một object JSON TRÊN CÙNG MỘT DÒNG. Không xuống dòng bên trong JSON.
+Không thụt đầu dòng, không bọc khối mã. Không in đậm nhãn FINAL:.
+Dùng nháy kép thẳng ASCII, không nháy cong hay dấu phẩy thừa.
+doc_id phải chép đúng mã nguồn đã quan sát, gồm doc- và ĐÚNG BỐN CHỮ SỐ
+(ví dụ định dạng doc-0004); không suy đoán mã từ ví dụ này.
 Có answer tiếng Việt trả lời thẳng câu hỏi (<600 ký tự), citations (mảng mã),
 abstain (boolean), claims (tối đa 4 object có text/doc_id). Không chép giao thức.
 
